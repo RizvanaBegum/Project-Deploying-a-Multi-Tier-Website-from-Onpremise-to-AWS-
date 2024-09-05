@@ -16,13 +16,15 @@ The solution uses **AWS Auto Scaling** to automatically add or remove EC2 instan
 
 ## Steps to Deploy
 
-### 1. Launch EC2 Instances
+### 1. Set Up Auto Scaling
+- Enable Auto Scaling to ensure a minimum of 2 EC2 instances are always running.
+
+
+### 2. Launch EC2 Instances via ASG
 - Launch an EC2 instance to host the PHP website.
 - Configure the instance to handle HTTP and SSH traffic.
 
-### 2. Set Up Auto Scaling
-- Enable Auto Scaling to ensure a minimum of 2 EC2 instances are always running.
-
+  
 ### 3. Create an RDS Instance
 - Launch an **Amazon RDS MySQL** instance.
 - Ensure the RDS instance is in a private subnet and can only be accessed by the application tier.
