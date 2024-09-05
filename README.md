@@ -18,18 +18,23 @@ The solution uses **AWS Auto Scaling** to automatically add or remove EC2 instan
 
 ### 1. Set Up Auto Scaling
 - Enable Auto Scaling to ensure a minimum of 2 EC2 instances are always running.
+- Set up a load balancer to uniformly distribute the traffic and create instances using the Launch template.
+- The Launch template consists of user data in which the instance gets the required php versions and the application is loaded to a S3 bucket and taken from there by the instance.
+- User data specifies the instance to be connected to RDS DB in the user data itself.
 
+### 2. IAM profile
+- A service role is created to give ec2 access to the s3 bucket - object [the application file]
 
-### 2. Launch EC2 Instances via ASG
+### 3. Launch EC2 Instances via ASG
 - Launch an EC2 instance to host the PHP website.
 - Configure the instance to handle HTTP and SSH traffic.
 
   
-### 3. Create an RDS Instance
+### 4. Create an RDS Instance
 - Launch an **Amazon RDS MySQL** instance.
 - Ensure the RDS instance is in a private subnet and can only be accessed by the application tier.
 
-### 4. Configure the Database
+### 5. Configure the Database
 - Create a MySQL database named `intel` and a table named `data`.
 - Secure the database with a password: `intel123`.
 
