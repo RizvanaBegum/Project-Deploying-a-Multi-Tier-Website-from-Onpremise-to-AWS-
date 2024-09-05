@@ -1,4 +1,5 @@
-# Deploying a Multi-Tier Website Using AWS EC2
+# Deploying a Multi-Tier Website from Onpremise to AWS
+
 
 ## Project Overview
 This project demonstrates the deployment of a multi-tier PHP-based web application using **Amazon Web Services (AWS)**. The solution leverages **Amazon EC2** for scalable computing, **Amazon RDS** for database management, and **Auto Scaling** to ensure high availability and handle variable traffic loads.
