@@ -1,0 +1,270 @@
+Resources:
+  ##creating security group for nstance
+  myinstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: allow ssh and http traffic
+        GroupName: myinstanceSG
+        VpcId: vpc-0f5e980c8d8c11076
+        SecurityGroupEgress: 
+            - IpProtocol: -1
+              CidrIp: 0.0.0.0/0
+        SecurityGroupIngress: 
+            -   CidrIp: 0.0.0.0/0
+                FromPort: 22
+                IpProtocol: tcp
+                ToPort: 22
+            -   CidrIp: 0.0.0.0/0
+                FromPort: 80
+                IpProtocol: tcp
+                ToPort: 80
+            -   CidrIp: 0.0.0.0/0
+                FromPort: 3306
+                IpProtocol: tcp
+                ToPort: 3306
+        Tags:
+        - Key: Name
+          Value: Project1
+
+  ##creating role for ec2 to access the web page which is loaded in s3
+  myRole:
+    Type: AWS::IAM::Role
+    Properties:
+        Description: Iam role created by cloud formation to give s3 object access for an ec2
+        RoleName: cfroleec2tohaves3objectaccessproject1
+        AssumeRolePolicyDocument:  
+          Version: 2012-10-17
+          Statement:        
+              Sid : Statement1
+              Effect: Allow
+              Principal: 
+                Service: 
+                    - 'ec2.amazonaws.com'
+              Action: sts:AssumeRole
+        Tags:
+        - Key: Name
+          Value: Project1
+
+        Policies: 
+           - PolicyName: ec2toaccesss3objectproject1
+             PolicyDocument: 
+                Version : 2012-10-17
+                Statement:
+                    Sid: VisualEditor0
+                    Effect: Allow
+                    Action: s3:GetObject
+                    Resource: "arn:aws:s3:::mygeneralbuckettt/index.php"
+
+  ##creating ec2 instance profile to attach to instance
+  myec2instanceprofile:
+        Type: AWS::IAM::InstanceProfile
+        Properties:
+            InstanceProfileName: instanceprofileproject1
+            Roles: 
+                - !Ref myRole
+
+  ##Launch template for ASG    
+  mylaunchtemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn: !GetAtt myec2instanceprofile.Arn
+        ImageId: ami-07c8c1b18ca66bb07
+        InstanceType: t3.micro
+        KeyName: Rizvana-stockHolm-pem
+        Monitoring:
+          Enabled: false
+        SecurityGroupIds:
+          - !Ref myinstanceSG
+        UserData: 
+          Fn::Base64: !Sub |
+                    #!/bin/bash
+                    sudo su
+                    apt-get update -y
+                    apt install  apache2 -y
+                    systemctl start apache2
+                    systemctl enable apache2
+                    cd /var/www/html
+                    sudo su
+                    rm index.html
+                    sudo touch index.php
+                    snap install aws-cli --classic
+                    aws s3 cp s3://mygeneralbuckettt/index.php /var/www/html/index.php
+                    sed -i "s/intelli.coghw13fheqo.us-east-2.rds.amazonaws.com/${dbtierrdsinstance.Endpoint.Address}/g" /var/www/html/index.php
+                    systemctl restart apache2
+                    apt-add-repository -y PPa:ondrej/php
+                    apt install php5.6 mysql-client php5.6-mysqli -y
+                    mysql -h ${dbtierrdsinstance.Endpoint.Address} -u intel -pintel123
+                    use intel;
+                    create table data(firstname varchar(50),email varchar(50));
+
+      LaunchTemplateName: CFLT
+      VersionDescription: 1
+
+
+  ##Autoscaling Group
+  myasg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: myasgcf
+      AvailabilityZones:
+        - eu-north-1a
+        - eu-north-1b
+        - eu-north-1c
+      DefaultInstanceWarmup: 20
+      MaxSize: '3'
+      MinSize: '1'
+      DesiredCapacity: '2'
+      TargetGroupARNs: 
+        - !Ref mytargetgroup
+      LaunchTemplate:
+        LaunchTemplateId: !Ref mylaunchtemplate
+        Version: '1'
+      Tags:
+        - Key: Name
+          Value: Project1
+          PropagateAtLaunch: true
+ 
+  ##Load Balancer
+  myelb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: myalbcf
+      Subnets:
+        - subnet-0c955ad97c99717b2
+        - subnet-05402719cc23e6eab
+      Tags:
+        - Key: Name
+          Value: Project1
+
+  mytargetgroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckPort: '80'
+      HealthCheckProtocol: HTTP
+      Name: mytargetgroupcf
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      VpcId: vpc-0f5e980c8d8c11076
+      Tags:
+        - Key: Name
+          Value: Project1
+
+
+  mylistener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref mytargetgroup
+      LoadBalancerArn: !Ref myelb
+      Port: 80
+      Protocol: HTTP
+
+  ##security group for rds
+  myDBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: allow mysql from public subnet
+        GroupName: myDBSG
+        VpcId: vpc-0f5e980c8d8c11076
+        SecurityGroupEgress: 
+            - IpProtocol: -1
+              CidrIp: 0.0.0.0/0
+        SecurityGroupIngress: 
+            -   SourceSecurityGroupId: !Ref myinstanceSG
+                FromPort: 3306
+                IpProtocol: tcp
+                ToPort: 3306
+        Tags:
+          - Key: Name
+            Value: Project1
+
+  ## rds subnet group
+  rdsSubnetGroup:
+        Type: "AWS::RDS::DBSubnetGroup"
+        Properties:
+            DBSubnetGroupDescription: "Subnet Group for mySQL database"
+            DBSubnetGroupName: subnetgroupforRDS
+            SubnetIds: 
+            - subnet-0c955ad97c99717b2
+            - subnet-05402719cc23e6eab
+            - subnet-05b2b3cbc7e4bab2a
+            Tags:
+             - Key: Name
+               Value: Project1
+
+  ## rds db instance
+  dbtierrdsinstance:
+        Type: AWS::RDS::DBInstance
+        Properties:
+            AllocatedStorage: 20
+            AllowMajorVersionUpgrade: false
+            AutoMinorVersionUpgrade: false
+            BackupRetentionPeriod: 1
+            CopyTagsToSnapshot: false
+            DBInstanceClass: db.t3.micro
+            DBInstanceIdentifier: casestudyrdsdb
+            VPCSecurityGroups: 
+                - !Ref myDBSG
+            DBSubnetGroupName: !Ref rdsSubnetGroup
+            DeletionProtection: false
+            DBName: intel
+            Engine: MYSQL
+            EngineVersion: 8.0.35
+            MasterUsername: intel
+            MasterUserPassword: intel123
+            MultiAZ: false
+            Port: 3306
+            StorageType: gp2
+            StorageEncrypted: false
+
+            Tags:
+             - Key: Name
+               Value: Project1
+
+
+
+
+
+Outputs:
+    rdsendpoint:
+     Description: endpoint of rds created in the stack
+     Value: !GetAtt dbtierrdsinstance.Endpoint.Address
+
+    rdsid:
+     Description: id of rds created
+     Value: !Ref dbtierrdsinstance
+
+
+    instancesecuritygroupid:
+     Description: id of sec grp of the ec2 
+     Value: !Ref myinstanceSG
+
+    dbsecuritygroupid:
+     Description: id of sec grp of the rds db
+     Value: !Ref myDBSG    
+
+    arnoftherole: 
+     Description: arn of role created for ec2 to access php file in s3
+     Value: !GetAtt myRole.Arn  
+
+    idofLaunchtemplate:
+     Description: id of Launch tenplate created
+     Value: !Ref mylaunchtemplate
+
+    idofasg:
+     Description: id of asg created
+     Value: !Ref myasg
+
+    elbid:
+     Description: id of elb created
+     Value: !Ref myelb
+
+    elbdns:
+     Description: dns of elb created
+     Value: !GetAtt myelb.DNSName
